@@ -1,0 +1,120 @@
+version: "2"
+services:
+  pwa:
+    build: gatsby
+    ports:
+      - 8000
+    labels:
+      - traefik.backend=pwa_magento23ce
+      - 'traefik.frontend.rule=Host:pwa.magento23ce.localhost'
+      - traefik.docker.network=proxy
+      - traefik.port=8000
+    volumes:
+      - ../src/storefront:/site
+    networks:
+      - proxy
+      - internal
+  web:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: web
+    labels:
+      - traefik.backend=magento23ce
+      - 'traefik.frontend.rule=Host:magento23ce.localhost'
+      - traefik.docker.network=proxy
+      - traefik.port=80
+    volumes:
+      - ./nginx/vhost.conf:/etc/nginx/conf.d/vhost.conf
+    volumes_from:
+      - appdata
+    links:
+      - fpm
+      - db
+  fpm:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: fpm
+    image: meanbee/magento2-php:7.2-fpm
+    links:
+      - db
+      - elasticsearch
+    volumes:
+      - ./php-xdebug.ini:/usr/local/etc/php/conf.d/zz-xdebug-settings.ini
+    volumes_from:
+      - appdata
+
+  db:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: db
+    volumes_from:
+      - dbdata
+
+  cli:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: cli
+    image: meanbee/magento2-php:7.2-cli
+    links:
+      - db
+      - elasticsearch
+    volumes_from:
+      - appdata
+    environment:
+      - M2SETUP_INSTALL_DB=true
+      - M2SETUP_DB_HOST=db
+      - M2SETUP_DB_NAME=magento2
+      - M2SETUP_DB_USER=magento2
+      - M2SETUP_DB_PASSWORD=magento2
+      - M2SETUP_BASE_URL=http://magento23ce.localhost/
+      - M2SETUP_SECURE_BASE_URL=https://magento23ce.localhost/
+      - M2SETUP_BACKEND_FRONTNAME=admin
+      - M2SETUP_ADMIN_FIRSTNAME=Admin
+      - M2SETUP_ADMIN_LASTNAME=User
+      - M2SETUP_ADMIN_EMAIL=dummy@gmail.com
+      - M2SETUP_ADMIN_USER=admin
+      - M2SETUP_ADMIN_PASSWORD=password1
+      - M2SETUP_VERSION=2.3.*
+      - M2SETUP_USE_SAMPLE_DATA=true
+  elasticsearch:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: elasticsearch
+    volumes:
+      - ../data/elastic:/usr/share/elasticsearch/data
+    ports:
+      - 9200
+    networks:
+      - internal
+
+  kibana:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: cli
+    links:
+      - elasticsearch
+    ports:
+      - 5601
+    networks:
+      - internal      
+
+  appdata:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: cli
+    volumes:
+      - ../src/magento:/var/www/magento
+
+  dbdata:
+    extends:
+      file: ../../../docker/docker-compose-base.yml
+      service: dbdata
+    volumes:
+      - ../data/mysql:/var/lib/mysql
+networks:
+  proxy:
+    external: true
+  internal:
+    external: false
+  elastic:
+    driver: bridge
