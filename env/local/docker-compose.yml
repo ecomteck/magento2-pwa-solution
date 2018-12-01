@@ -1,22 +1,28 @@
 version: "2"
 services:
+  proxy:
+    extends:
+      file: ../common/docker-compose-base.yml
+      service: proxy
+    ports:
+        - 80:80
+        - 8080:8080
+        - 443:443
   pwa:
-    build: gatsby
+    extends:
+      file: ../common/docker-compose-base.yml
+      service: pwa
     ports:
       - 8000
     labels:
       - traefik.backend=pwa_magento23ce
       - 'traefik.frontend.rule=Host:pwa.magento23ce.localhost'
-      - traefik.docker.network=proxy
       - traefik.port=8000
     volumes:
       - ../src/storefront:/site
-    networks:
-      - proxy
-      - internal
   web:
     extends:
-      file: ../../../docker/docker-compose-base.yml
+      file: ../common/docker-compose-base.yml
       service: web
     labels:
       - traefik.backend=magento23ce
@@ -32,7 +38,7 @@ services:
       - db
   fpm:
     extends:
-      file: ../../../docker/docker-compose-base.yml
+      file: ../common/docker-compose-base.yml
       service: fpm
     image: meanbee/magento2-php:7.2-fpm
     links:
@@ -45,14 +51,14 @@ services:
 
   db:
     extends:
-      file: ../../../docker/docker-compose-base.yml
+      file: ../common/docker-compose-base.yml
       service: db
     volumes_from:
       - dbdata
 
   cli:
     extends:
-      file: ../../../docker/docker-compose-base.yml
+      file: ../common/docker-compose-base.yml
       service: cli
     image: meanbee/magento2-php:7.2-cli
     links:
@@ -78,43 +84,34 @@ services:
       - M2SETUP_USE_SAMPLE_DATA=true
   elasticsearch:
     extends:
-      file: ../../../docker/docker-compose-base.yml
+      file: ../common/docker-compose-base.yml
       service: elasticsearch
     volumes:
       - ../data/elastic:/usr/share/elasticsearch/data
     ports:
       - 9200
-    networks:
-      - internal
 
   kibana:
     extends:
-      file: ../../../docker/docker-compose-base.yml
-      service: cli
+      file: ../common/docker-compose-base.yml
+      service: kibana
     links:
       - elasticsearch
+    depends_on:
+      - elasticsearch
     ports:
-      - 5601
-    networks:
-      - internal      
+      - 5601      
 
   appdata:
     extends:
-      file: ../../../docker/docker-compose-base.yml
-      service: cli
+      file: ../common/docker-compose-base.yml
+      service: appdata
     volumes:
       - ../src/magento:/var/www/magento
 
   dbdata:
     extends:
-      file: ../../../docker/docker-compose-base.yml
+      file: ../common/docker-compose-base.yml
       service: dbdata
     volumes:
       - ../data/mysql:/var/lib/mysql
-networks:
-  proxy:
-    external: true
-  internal:
-    external: false
-  elastic:
-    driver: bridge
